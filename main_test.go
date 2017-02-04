@@ -47,11 +47,11 @@ var examples = []example{
 	{"t103", "foo {{bar|qux|abc}} baz", `foo <template name="bar"><arg name="">qux</arg><arg name="">abc</arg></template> baz`, ""},
 	{"t104", "foo {{bar|qux=abc}} baz", `foo <template name="bar"><arg name="qux">abc</arg></template> baz`, ""},
 
-  // Nested templates
-  {"t201",
-    "foo {{bar|{{qux|xyz}}|a=c}} baz",
-    `foo <template name="bar"><arg name=""><template name="qux"><arg name="">xyz</arg></template></arg><arg name="a">c</arg></template> baz`,
-    ""},
+	// Nested templates
+	{"t201",
+		"foo {{bar|{{qux|xyz}}|a=c}} baz",
+		`foo <template name="bar"><arg name=""><template name="qux"><arg name="">xyz</arg></template></arg><arg name="a">c</arg></template> baz`,
+		""},
 
 	// Headings
 	{"h101", "====== The Heading ======\nbar", "<h6> The Heading </h6>\nbar", ""},
@@ -122,13 +122,13 @@ func TestExamples(t *testing.T) {
 		html := WikiToHtml(test.wiki)
 		if html != test.html {
 			t.Errorf("%v:\n  expected HTML: '%v'\n      from wiki: '%v'\n            got: '%v'\n\n",
-        test.name, test.html, test.wiki, html)
+				test.name, test.html, test.wiki, html)
 		}
 
 		wiki := HtmlToWiki(test.html)
 		if wiki != test.newWiki {
-      t.Errorf("%v:\n  expected wiki: '%v'\n      from HTML: '%v'\n            got: '%v'\n\n",
-        test.name, test.newWiki, test.html, wiki)
+			t.Errorf("%v:\n  expected wiki: '%v'\n      from HTML: '%v'\n            got: '%v'\n\n",
+				test.name, test.newWiki, test.html, wiki)
 		}
 	}
 }
