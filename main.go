@@ -207,7 +207,7 @@ func processTemplates(wikimarkup string) string {
 	substitutions := []string{}
 
 	for templateDepth := maxTemplateDepth; templateDepth >= 0; templateDepth-- {
-		re := regexp.MustCompile(fmt.Sprintf("{{%d([^|}]+)\\|?(.*?)%d}}", templateDepth, templateDepth))
+		re := regexp.MustCompile(fmt.Sprintf("(?s){{%d([^|}]+)\\|?(.*?)%d}}", templateDepth, templateDepth))
 		wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 			r := `<template name="` + groups[1] + `">`
 
@@ -216,7 +216,7 @@ func processTemplates(wikimarkup string) string {
 				for _, param := range params {
 					if strings.Contains(param, "=") {
 						kv := strings.Split(param, "=")
-						r += fmt.Sprintf(`<arg name="%v">%v</arg>`, kv[0], kv[1])
+						r += fmt.Sprintf(`<arg name="%v">%v</arg>`, strings.TrimSpace(kv[0]), kv[1])
 					} else {
 						r += fmt.Sprintf(`<arg name="">%v</arg>`, param)
 					}
