@@ -12,6 +12,7 @@ import (
     "bufio"
     "html"
     "io/ioutil"
+    "os/user"
 )
 
 func ReplaceAllStringSubmatchFunc(re *regexp.Regexp, str string, repl func([]string) string) string {
@@ -366,12 +367,17 @@ func WikiToHtml(wikimarkup string) string {
 }
 
 func main() {
-    fmt.Printf("Wiki URL or File: ")
-    reader := bufio.NewReader(os.Stdin)
-    input, _ := reader.ReadString('\n')
+    if len(os.Args) < 2 {
+        fmt.Printf("Usage: %v <html file or wiki URL>\n\n", os.Args[0])
+        fmt.Printf("Examples:\n  %v https://en.wikipedia.org/wiki/Staffordshire_Bull_Terrier\n", os.Args[0])
+        fmt.Printf("  %v Staffordshire_Bull_Terrier.html\n\n", os.Args[0])
+        return
+    }
 
-    if input[0] == 'h' {
-        fmt.Printf("Downloading page...")
+    input := os.Args[1]
+
+    if strings.HasPrefix(input, "http") {
+        fmt.Printf("Downloading page... ")
 
         tokens := strings.Split(input, "/")
         title := strings.TrimSpace(tokens[len(tokens) - 1])
@@ -390,9 +396,17 @@ func main() {
         re := regexp.MustCompile("(?s)<textarea.*?>(.*)</textarea>")
         wikimarkup := html.UnescapeString(re.FindStringSubmatch(content)[1])
 
-        fmt.Printf(" Done\n")
+        usr, err := user.Current()
+        if err != nil {
+            panic(err)
+        }
 
-        fileHandle, _ := os.Create(title + ".html")
+        destinationFolder := usr.HomeDir + "/Downloads"
+        destinationPath := destinationFolder + "/" + title + ".html"
+
+        fmt.Printf(" Done\nThe file has been created at: " + destinationPath + "\n")
+
+        fileHandle, _ := os.Create(destinationPath)
         writer := bufio.NewWriter(fileHandle)
         defer fileHandle.Close()
 
