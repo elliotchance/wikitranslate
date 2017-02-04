@@ -209,13 +209,13 @@ func processTemplates(wikimarkup string) string {
 	for templateDepth := maxTemplateDepth; templateDepth >= 0; templateDepth-- {
 		re := regexp.MustCompile(fmt.Sprintf("(?s){{%d([^|}]+)\\|?(.*?)%d}}", templateDepth, templateDepth))
 		wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
-			r := `<template name="` + groups[1] + `">`
+			r := `<template name="` + strings.TrimSpace(groups[1]) + `">`
 
 			if groups[2] != "" {
 				params := strings.Split(groups[2], "|")
 				for _, param := range params {
-					if strings.Contains(param, "=") {
-						kv := strings.Split(param, "=")
+					if result, _ := regexp.MatchString("^[\\w\\s]+=", param); result {
+						kv := strings.SplitN(param, "=", 2)
 						r += fmt.Sprintf(`<arg name="%v">%v</arg>`, strings.TrimSpace(kv[0]), kv[1])
 					} else {
 						r += fmt.Sprintf(`<arg name="">%v</arg>`, param)
@@ -263,8 +263,6 @@ func WikiToHtml(wikimarkup string) string {
 		return fmt.Sprintf(`<ref data="%v"%v></ref>`, encoded, groups[1])
 	})
 
-	wikimarkup = processTemplates(wikimarkup)
-
 	re = regexp.MustCompile("'''(.+?)'''")
 	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		return "<strong>" + groups[1] + "</strong>"
@@ -275,6 +273,8 @@ func WikiToHtml(wikimarkup string) string {
 		return "<em>" + groups[1] + "</em>"
 	})
 
+	// The links have to be processed before the templates because the regex
+	// will get confused with the shared pipe.
 	re = regexp.MustCompile("\\[\\[(.+?)\\]\\]")
 	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		// File:
@@ -292,7 +292,8 @@ func WikiToHtml(wikimarkup string) string {
 				parts[2] = ""
 			}
 
-			return fmt.Sprintf(`<img src="%v" options="%v" link="%v">%v</a>`, parts[0][5:], parts[1], link, parts[2])
+			return fmt.Sprintf(`<img src="%v" options="%v" link="%v">%v</a>`,
+				parts[0][5:], parts[1], link, parts[2])
 		}
 
 		// Else
@@ -303,6 +304,8 @@ func WikiToHtml(wikimarkup string) string {
 			return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[1])
 		}
 	})
+
+	wikimarkup = processTemplates(wikimarkup)
 
 	re = regexp.MustCompile("\\[(.{10,}?)\\]")
 	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {

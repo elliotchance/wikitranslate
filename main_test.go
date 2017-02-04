@@ -63,6 +63,14 @@ var examples = []example{
 		"foo {{bar| qux =abc}} baz",
 		`foo <template name="bar"><arg name="qux">abc</arg></template> baz`,
 		"foo {{bar|qux=abc}} baz"},
+	{"t107",
+		"foo {{bar\n|qux=abc}} baz",
+		`foo <template name="bar"><arg name="qux">abc</arg></template> baz`,
+		"foo {{bar|qux=abc}} baz"},
+	{"t108",
+		"foo {{bar\n|qux=[[abc|foo]]}} baz",
+		`foo <template name="bar"><arg name="qux"><a href="abc">foo</a></arg></template> baz`,
+		"foo {{bar|qux=[[abc|foo]]}} baz"},
 
 	// Nested templates
 	{"t201",
