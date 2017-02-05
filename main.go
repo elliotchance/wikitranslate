@@ -30,7 +30,7 @@ func isAnExternalURL(url string) bool {
 	return strings.Contains(url, "://")
 }
 
-func ReplaceAllStringSubmatchFunc(re *regexp.Regexp, str string, repl func([]string) string) string {
+func replaceAllStringSubmatchFunc(re *regexp.Regexp, str string, repl func([]string) string) string {
 	result := ""
 	lastIndex := 0
 
@@ -87,9 +87,16 @@ func BalanceHtmlTags(html string) string {
 
 func processHtmlLinks(html string) string {
 	re := regexp.MustCompile(`<a href="(.*?)">(.*?)</a>`)
-	return ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	return replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		if groups[1] == groups[2] || groups[2] == "" {
+			if isAnExternalURL(groups[1]) {
+				return fmt.Sprintf(`[%v]`, groups[1])
+			}
 			return fmt.Sprintf(`[[%v]]`, groups[1])
+		}
+
+		if isAnExternalURL(groups[1]) {
+			return fmt.Sprintf(`[%v %v]`, groups[1], groups[2])
 		}
 
 		return fmt.Sprintf(`[[%v|%v]]`, groups[1], groups[2])
@@ -98,7 +105,7 @@ func processHtmlLinks(html string) string {
 
 func HtmlToWiki(html string) string {
 	re := regexp.MustCompile(`<img src="(.*?)" options="(.*?)" link="(.*?)">(.*?)</img>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		r := fmt.Sprintf(`[[File:%v`, groups[1])
 		if groups[2] != "" || groups[3] != "" {
 			r += "|" + groups[2]
@@ -129,7 +136,7 @@ func HtmlToWiki(html string) string {
 	html = strings.Replace(html, "</oli>", "", -1)
 
 	re = regexp.MustCompile(`<h(.)>(.+?)</h.>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		level, err := strconv.Atoi(groups[1])
 		if err != nil {
 			panic(err)
@@ -142,13 +149,13 @@ func HtmlToWiki(html string) string {
 
 	for templateDepth := maxTemplateDepth; templateDepth >= 0; templateDepth-- {
 		re = regexp.MustCompile(fmt.Sprintf(`<template%v name="(.+?)">(.*?)<%v/template>`, templateDepth, templateDepth))
-		html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+		html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 			if groups[2] == "" {
 				return fmt.Sprintf(`{{%v}}`, groups[1])
 			}
 
 			re = regexp.MustCompile(`<arg name="(.*?)">(.*?)</arg>`)
-			result := ReplaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
+			result := replaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
 				if groups[1] == "" {
 					return fmt.Sprintf(`|%v`, groups[2])
 				}
@@ -161,13 +168,13 @@ func HtmlToWiki(html string) string {
 	}
 
 	re = regexp.MustCompile(`(?s)<table(.*?)>(.*?)</table>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		result := "{|"
 
 		re = regexp.MustCompile(`(?s)<tr(.*?)>\n(.*?)\n</tr>`)
-		result += ReplaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
+		result += replaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
 			re = regexp.MustCompile(`(?s)<t([dh])(.*?)>(.*?)</t[dh]>`)
-			return "|-" + strings.TrimSpace(groups[1]) + "\n" + ReplaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
+			return "|-" + strings.TrimSpace(groups[1]) + "\n" + replaceAllStringSubmatchFunc(re, groups[2], func(groups []string) string {
 				if groups[1] == "d" {
 					return "|" + groups[3]
 				}
@@ -179,7 +186,7 @@ func HtmlToWiki(html string) string {
 	})
 
 	re = regexp.MustCompile(`<ref data="(.*?)"(.*?)></ref>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		decoded, err := base64.StdEncoding.DecodeString(groups[1])
 		if err != nil {
 			panic(err)
@@ -189,7 +196,7 @@ func HtmlToWiki(html string) string {
 	})
 
 	re = regexp.MustCompile(`<nowiki data="(.*?)"(.*?)></nowiki>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+	html = replaceAllStringSubmatchFunc(re, html, func(groups []string) string {
 		decoded, err := base64.StdEncoding.DecodeString(groups[1])
 		if err != nil {
 			panic(err)
@@ -204,7 +211,7 @@ func HtmlToWiki(html string) string {
 func prepareNesting(s, left, right string) string {
 	re := regexp.MustCompile(fmt.Sprintf("(%v|%v)", left, right))
 	depth := 0
-	s = ReplaceAllStringSubmatchFunc(re, s, func(groups []string) string {
+	s = replaceAllStringSubmatchFunc(re, s, func(groups []string) string {
 		if groups[1] == left {
 			r := left + strconv.Itoa(depth)
 			depth += 1
@@ -225,7 +232,7 @@ func processTemplates(wikimarkup string) string {
 
 	for templateDepth := maxTemplateDepth; templateDepth >= 0; templateDepth-- {
 		re := regexp.MustCompile(fmt.Sprintf("(?s){{%d([^|}]+)\\|?(.*?)%d}}", templateDepth, templateDepth))
-		wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+		wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 			r := `<template name="` + strings.TrimSpace(groups[1]) + `">`
 
 			if groups[2] != "" {
@@ -269,7 +276,7 @@ func processTemplates(wikimarkup string) string {
 
 func processWikiLinks(wikimarkup string) string {
 	re := regexp.MustCompile("\\[\\[(.+?)\\]\\]")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		// File:
 		if strings.HasPrefix(groups[1], "File:") {
 			parts := strings.SplitN(groups[1], "|", 3)
@@ -307,24 +314,24 @@ func processWikiLinks(wikimarkup string) string {
 
 func WikiToHtml(wikimarkup string) string {
 	re := regexp.MustCompile(`<nowiki(.*?)>(.*?)</nowiki>`)
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		encoded := base64.StdEncoding.EncodeToString([]byte(groups[2]))
 		return fmt.Sprintf(`<nowiki data="%v"%v></nowiki>`, encoded, groups[1])
 	})
 
 	re = regexp.MustCompile(`<ref(.*?)>(.*?)</ref>`)
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		encoded := base64.StdEncoding.EncodeToString([]byte(groups[2]))
 		return fmt.Sprintf(`<ref data="%v"%v></ref>`, encoded, groups[1])
 	})
 
 	re = regexp.MustCompile("'''(.+?)'''")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		return "<strong>" + groups[1] + "</strong>"
 	})
 
 	re = regexp.MustCompile("''(.+?)''")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		return "<em>" + groups[1] + "</em>"
 	})
 
@@ -334,27 +341,27 @@ func WikiToHtml(wikimarkup string) string {
 
 	wikimarkup = processTemplates(wikimarkup)
 
-	re = regexp.MustCompile("\\[(.{10,}?)\\]")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	re = regexp.MustCompile("\\[(.{8,}?)\\]")
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		parts := strings.SplitN(groups[1], " ", 2)
 		if len(parts) == 1 {
-			return "<a>" + groups[1] + "</a>"
-		} else {
-			return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[1])
+			parts = append(parts, "")
 		}
+
+		return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[1])
 	})
 
 	// Headings
 	for i := 6; i >= 1; i-- {
 		re = regexp.MustCompile("(^|\\s)" + strings.Repeat("=", i) + "(.+?)" + strings.Repeat("=", i))
-		wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+		wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 			return fmt.Sprintf("%v<h%v>%v</h%v>", groups[1], i, groups[2], i)
 		})
 	}
 
 	// Bullet points/lists
 	re = regexp.MustCompile("(?m)^([*#])([^\\n]+)")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
 		if groups[1] == "*" {
 			return fmt.Sprintf("<li>%v</li>", groups[2])
 		}
@@ -367,7 +374,7 @@ func WikiToHtml(wikimarkup string) string {
 
 	// Tables
 	re = regexp.MustCompile("(?s){\\|([^\\n]*)(.*?)\\|}")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(table_groups []string) string {
+	wikimarkup = replaceAllStringSubmatchFunc(re, wikimarkup, func(table_groups []string) string {
 		table := "<table " + table_groups[1] + ">\n"
 
 		lines := strings.Split(table_groups[2], "\n")
