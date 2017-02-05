@@ -26,6 +26,20 @@ var examples = []example{
 	{"l102", "foo [[Bar|some label]] baz", `foo <a href="Bar">some label</a> baz`, ""},
 	{"l103", "foo [[Bar|some label|foo]] baz", `foo <a href="Bar">some label|foo</a> baz`, ""},
 
+	// External links
+	{"l201",
+		"foo [[https://foo.bar/nowhere?query=string#fragment]] baz",
+		`foo <a href="https://foo.bar/nowhere?query=string#fragment"></a> baz`,
+		""},
+	{"l202",
+		"foo [[https://foo.bar/nowhere?query=string#fragment|some label]] baz",
+		`foo <a href="https://foo.bar/nowhere?query=string#fragment">some label</a> baz`,
+		""},
+	{"l203",
+		"foo [[https://foo.bar/nowhere?query=string#fragment|some label|foo]] baz",
+		`foo <a href="https://foo.bar/nowhere?query=string#fragment">some label|foo</a> baz`,
+		""},
+
 	// Images
 	{"i101", "foo [[File:filename.extension]] baz", `foo <img src="filename.extension" options="" link=""></img> baz`, ""},
 	{"i102", "foo [[File:filename.extension|options]] baz", `foo <img src="filename.extension" options="options" link=""></img> baz`, ""},

@@ -17,6 +17,16 @@ import (
 
 const maxTemplateDepth = 8
 
+// func check(err Error) {
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// }
+
+func isAnExternalURL(url string) bool {
+	return strings.Contains(url, "://")
+}
+
 func ReplaceAllStringSubmatchFunc(re *regexp.Regexp, str string, repl func([]string) string) string {
 	result := ""
 	lastIndex := 0
@@ -72,6 +82,17 @@ func BalanceHtmlTags(html string) string {
 	return result
 }
 
+func processHtmlLinks(html string) string {
+	re := regexp.MustCompile(`<a href="(.*?)">(.*?)</a>`)
+	return ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
+		if groups[1] == groups[2] || groups[2] == "" {
+			return fmt.Sprintf(`[[%v]]`, groups[1])
+		}
+
+		return fmt.Sprintf(`[[%v|%v]]`, groups[1], groups[2])
+	})
+}
+
 func HtmlToWiki(html string) string {
 	re := regexp.MustCompile(`<img src="(.*?)" options="(.*?)" link="(.*?)">(.*?)</img>`)
 	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
@@ -89,14 +110,7 @@ func HtmlToWiki(html string) string {
 		return r + "]]"
 	})
 
-	re = regexp.MustCompile(`<a href="(.*?)">(.+?)</a>`)
-	html = ReplaceAllStringSubmatchFunc(re, html, func(groups []string) string {
-		if groups[1] == groups[2] {
-			return fmt.Sprintf(`[[%v]]`, groups[1])
-		}
-
-		return fmt.Sprintf(`[[%v|%v]]`, groups[1], groups[2])
-	})
+	html = processHtmlLinks(html)
 
 	html = strings.Replace(html, "<strong><em>", "'''''", -1)
 	html = strings.Replace(html, "</strong></em>", "'''''", -1)
@@ -250,6 +264,44 @@ func processTemplates(wikimarkup string) string {
 	return wikimarkup
 }
 
+func processWikiLinks(wikimarkup string) string {
+	re := regexp.MustCompile("\\[\\[(.+?)\\]\\]")
+	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
+		// File:
+		if strings.HasPrefix(groups[1], "File:") {
+			parts := strings.SplitN(groups[1], "|", 3)
+			if len(parts) == 1 {
+				parts = append(parts, "", "")
+			} else if len(parts) == 2 {
+				parts = append(parts, "")
+			}
+
+			link := ""
+			if strings.HasPrefix(parts[2], "link=") {
+				link = parts[2][5:]
+				parts[2] = ""
+			}
+
+			return fmt.Sprintf(`<img src="%v" options="%v" link="%v">%v</a>`,
+				parts[0][5:], parts[1], link, parts[2])
+		}
+
+		// Else
+		parts := strings.SplitN(groups[1], "|", 2)
+		if len(parts) == 1 {
+			if isAnExternalURL(parts[0]) {
+				parts = append(parts, "")
+			} else {
+				parts = append(parts, parts[0])
+			}
+		}
+
+		return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[1])
+	})
+
+	return wikimarkup
+}
+
 func WikiToHtml(wikimarkup string) string {
 	re := regexp.MustCompile(`<nowiki(.*?)>(.*?)</nowiki>`)
 	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
@@ -275,35 +327,7 @@ func WikiToHtml(wikimarkup string) string {
 
 	// The links have to be processed before the templates because the regex
 	// will get confused with the shared pipe.
-	re = regexp.MustCompile("\\[\\[(.+?)\\]\\]")
-	wikimarkup = ReplaceAllStringSubmatchFunc(re, wikimarkup, func(groups []string) string {
-		// File:
-		if strings.HasPrefix(groups[1], "File:") {
-			parts := strings.SplitN(groups[1], "|", 3)
-			if len(parts) == 1 {
-				parts = append(parts, "", "")
-			} else if len(parts) == 2 {
-				parts = append(parts, "")
-			}
-
-			link := ""
-			if strings.HasPrefix(parts[2], "link=") {
-				link = parts[2][5:]
-				parts[2] = ""
-			}
-
-			return fmt.Sprintf(`<img src="%v" options="%v" link="%v">%v</a>`,
-				parts[0][5:], parts[1], link, parts[2])
-		}
-
-		// Else
-		parts := strings.SplitN(groups[1], "|", 2)
-		if len(parts) == 1 {
-			return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[0])
-		} else {
-			return fmt.Sprintf(`<a href="%v">%v</a>`, parts[0], parts[1])
-		}
-	})
+	wikimarkup = processWikiLinks(wikimarkup)
 
 	wikimarkup = processTemplates(wikimarkup)
 
