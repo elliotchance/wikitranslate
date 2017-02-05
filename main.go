@@ -18,7 +18,7 @@ import (
 
 const maxTemplateDepth = 8
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 func check(err error) {
 	if err != nil {
