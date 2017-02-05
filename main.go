@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html"
 	"io/ioutil"
@@ -17,11 +18,13 @@ import (
 
 const maxTemplateDepth = 8
 
-// func check(err Error) {
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
+const Version = "0.1.0"
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
 func isAnExternalURL(url string) bool {
 	return strings.Contains(url, "://")
@@ -448,6 +451,38 @@ func WikiToHtml(wikimarkup string) string {
 	return BalanceHtmlTags(wikimarkup)
 }
 
+func downloadURL(url string) *bytes.Buffer {
+	response, err := http.Get(url)
+	check(err)
+	defer response.Body.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(response.Body)
+	return buf
+}
+
+func createOrReplaceFileWithString(fileName, content string) {
+	fileHandle, err := os.Create(fileName)
+	check(err)
+
+	writer := bufio.NewWriter(fileHandle)
+	defer fileHandle.Close()
+
+	writer.WriteString(content)
+	writer.Flush()
+}
+
+func createOrReplaceFileWithBytes(fileName string, content []byte) {
+	fileHandle, err := os.Create(fileName)
+	check(err)
+
+	writer := bufio.NewWriter(fileHandle)
+	defer fileHandle.Close()
+
+	writer.Write(content)
+	writer.Flush()
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("Usage: %v <html file or wiki URL>\n\n", os.Args[0])
@@ -458,6 +493,35 @@ func main() {
 
 	input := os.Args[1]
 
+	if input == "update" {
+		fmt.Printf("The current version is v%v\n", Version)
+		fmt.Printf("Finding the latest version... ")
+		latestReleaseJson := downloadURL(
+			"https://api.github.com/repos/elliotchance/wikitranslate/releases/latest").String()
+
+		var latestRelease map[string]interface{}
+		json.Unmarshal([]byte(latestReleaseJson), &latestRelease)
+		latestReleaseVersion := latestRelease["tag_name"].(string)[1:]
+
+		fmt.Printf("v%v\n", latestReleaseVersion)
+
+		if Version == latestReleaseVersion {
+			fmt.Printf("You are running the latest version. No update required.\n\n")
+			return
+		}
+
+		fmt.Printf("Downloading the latest version... ")
+		bin := downloadURL(fmt.Sprintf(
+			"https://github.com/elliotchance/wikitranslate/releases/download/v%v/wikitranslate-macosx", latestReleaseVersion)).Bytes()
+		fmt.Printf("Done (%.2f MB)\n", float64(len(bin))/1048576.0)
+
+		fmt.Printf("Installing... ")
+		createOrReplaceFileWithBytes(os.Args[0], bin)
+		fmt.Printf("Done\n\n")
+
+		return
+	}
+
 	if strings.HasPrefix(input, "http") {
 		fmt.Printf("Downloading page... ")
 
@@ -465,15 +529,7 @@ func main() {
 		title := strings.TrimSpace(tokens[len(tokens)-1])
 
 		url := "https://en.wikipedia.org/w/index.php?title=" + title + "&action=edit"
-		response, err := http.Get(url)
-		if err != nil {
-			panic(err)
-		}
-		defer response.Body.Close()
-
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(response.Body)
-		content := buf.String()
+		content := downloadURL(url).String()
 
 		re := regexp.MustCompile("(?s)<textarea.*?>(.*)</textarea>")
 		wikimarkup := html.UnescapeString(re.FindStringSubmatch(content)[1])
